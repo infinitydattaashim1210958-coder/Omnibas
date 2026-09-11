@@ -240,13 +240,31 @@ class OpenAiClient {
     }
 
     private fun humanError(code: Int, body: String): String {
-        val snippet = body.trim().take(180)
+        // Prefer the upstream's own reason (OpenAI-style {"error":{"message":...}},
+        // used by OmniRoute, cheaperinference.com, and most /v1-compatible gateways)
+        // over a fixed string, so a 401 from provider X and a 401 from provider Y
+        // no longer read as the same generic "key rejected" message. #<this fix>:
+        // previously every 401/403 was replaced with a hardcoded string and the
+        // real body was discarded, so the true reason was never visible to the user.
+        val snippet = extractErrorMessage(body) ?: body.trim().take(180)
         return when (code) {
-            401, 403 -> "That key was rejected. Check the API key in Settings."
+            401, 403 ->
+                if (snippet.isBlank()) "That key was rejected. Check the API key in Settings."
+                else "Key rejected ($code): $snippet"
             404 -> "Endpoint not found. Check the base URL."
             429 -> "The route is rate-limited. Try again in a moment."
             in 500..599 -> "The gateway is busy ($code). Try again shortly."
             else -> if (snippet.isBlank()) "Couldn't reach OmniRoute ($code)" else snippet
+        }
+    }
+
+    private fun extractErrorMessage(body: String): String? {
+        return try {
+            val json = JSONObject(body)
+            json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
+                ?: json.optString("message").takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
         }
     }
 
