@@ -723,6 +723,7 @@ private fun SettingsScreen(vm: ChatViewModel) {
     var apiKey by remember { mutableStateOf(vm.settings.apiKey) }
     var model by remember { mutableStateOf(vm.settings.model) }
     var hideKey by remember { mutableStateOf(true) }
+    var modelMenu by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -792,9 +793,73 @@ private fun SettingsScreen(vm: ChatViewModel) {
                         LabeledField("Base URL", baseUrl, { baseUrl = it }, "http://127.0.0.1:4141/v1")
                         Spacer(Modifier.height(12.dp))
                         LabeledField("Model", model, { model = it }, "auto")
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(OmniSurface2)
+                                .clickable(enabled = !vm.modelsLoading) {
+                                    vm.loadModels(baseUrl.trim(), apiKey.trim())
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = null,
+                                tint = OmniAccent,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (vm.modelsLoading) "Loading…" else "Fetch models from server",
+                                color = OmniAccent,
+                                fontSize = 13.sp,
+                            )
+                        }
+                        vm.modelsError?.let { err ->
+                            Text(
+                                err,
+                                color = OmniDanger,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
+                        if (vm.availableModels.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Box {
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(OmniSurface2)
+                                        .clickable { modelMenu = true }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        "${vm.availableModels.size} models found — tap to choose",
+                                        color = OmniMuted,
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
+                                    vm.availableModels.forEach { id ->
+                                        DropdownMenuItem(
+                                            text = { Text(id) },
+                                            onClick = {
+                                                model = id
+                                                modelMenu = false
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(12.dp))
                         LabeledField(
-                            "API key (optional)",
+                            "API key (required if your OmniRoute server has REQUIRE_API_KEY on)",
                             apiKey,
                             { apiKey = it },
                             "sk-…",

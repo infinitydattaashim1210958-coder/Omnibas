@@ -46,8 +46,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     var streamingMessageId by mutableStateOf<String?>(null)
         private set
     var toast by mutableStateOf<String?>(null)
+    var availableModels by mutableStateOf<List<String>>(emptyList())
+        private set
+    var modelsLoading by mutableStateOf(false)
+        private set
+    var modelsError by mutableStateOf<String?>(null)
+        private set
 
     private var job: Job? = null
+    private var modelsJob: Job? = null
 
     init {
         val snap = store.load()
@@ -238,6 +245,27 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun consumeToast() {
         toast = null
+    }
+
+    /** Fetch the model list from {baseUrl}/models for the Settings model picker. */
+    fun loadModels(baseUrl: String, apiKey: String) {
+        if (modelsLoading) return
+        modelsLoading = true
+        modelsError = null
+        modelsJob = viewModelScope.launch {
+            try {
+                val models = withContext(Dispatchers.IO) {
+                    client.fetchModels(baseUrl, apiKey)
+                }
+                availableModels = models
+                if (models.isEmpty()) modelsError = "Server returned no models."
+            } catch (e: Exception) {
+                availableModels = emptyList()
+                modelsError = e.message?.ifBlank { null } ?: "Couldn't load models."
+            } finally {
+                modelsLoading = false
+            }
+        }
     }
 
     fun newId(): String = UUID.randomUUID().toString()
