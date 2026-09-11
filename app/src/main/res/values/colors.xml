@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="omni_bg">#090B0E</color>
+    <color name="omni_accent">#6EC9B8</color>
+    <color name="omni_accent_dim">#16352F</color>
+    <color name="omni_accent_fg">#07110F</color>
+    <color name="omni_fg">#EEF0F2</color>
+</resources>
