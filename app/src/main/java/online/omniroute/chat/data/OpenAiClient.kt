@@ -54,6 +54,47 @@ class OpenAiClient {
         return pollinations(packed, route.temperature, onDelta)
     }
 
+    /**
+     * GET {baseUrl}/models against an OpenAI-compatible endpoint (OmniRoute's
+     * /v1/models route included) and return the list of model ids.
+     * Throws IOException with a humanError() message on non-2xx responses,
+     * reusing the same 401/403/404/429/5xx mapping as chat completions.
+     */
+    fun fetchModels(baseUrl: String, apiKey: String): List<String> {
+        val builder = Request.Builder()
+            .url(modelsUrl(baseUrl))
+            .get()
+            .header("Accept", "application/json")
+        if (apiKey.isNotBlank()) builder.header("Authorization", "Bearer $apiKey")
+        val call = http.newCall(builder.build())
+        activeCall = call
+        call.execute().use { response ->
+            if (!response.isSuccessful) {
+                val err = response.body?.string().orEmpty()
+                throw IOException(humanError(response.code, err))
+            }
+            val payload = response.body?.string().orEmpty()
+            return parseModelIds(payload)
+        }
+    }
+
+    private fun modelsUrl(base: String): String {
+        val t = base.trim().trimEnd('/')
+        return if (t.endsWith("/models")) t else "$t/models"
+    }
+
+    private fun parseModelIds(payload: String): List<String> {
+        return try {
+            val json = JSONObject(payload)
+            val data = json.optJSONArray("data") ?: return emptyList()
+            (0 until data.length()).mapNotNull { i ->
+                data.optJSONObject(i)?.optString("id")?.takeIf { it.isNotBlank() }
+            }.distinct().sorted()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
     private fun streamOpenAi(
         baseUrl: String,
         apiKey: String,
